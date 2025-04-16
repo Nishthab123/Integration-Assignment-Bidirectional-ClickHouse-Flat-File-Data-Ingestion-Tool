@@ -1,0 +1,58 @@
+services:
+  clickhouse-server:
+    build: ./clickhouse
+    container_name: clickhouse-server
+    ports:
+      - "8123:8123" # HTTP port
+      - "9000:9000" # TCP port (for client)
+    networks:
+      - main_network
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse/data
+      - clickhouse-log:/var/log/clickhouse-server/
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 3
+    # restart: on-failure
+
+  node-server:
+    build: ./node-server
+    container_name: node-server
+    ports:
+      - "5000:5000"
+    networks:
+      - main_network
+    environment:
+      CLICKHOUSE_HOST: clickhouse-server
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+    depends_on:
+      - clickhouse-server
+    restart: on-failure
+
+  next-app:
+    build: ./next-app
+    container_name: next-app
+    ports:
+      - "3000:3000"
+    networks:
+      - main_network
+    depends_on:
+      - node-server
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://node-server:5000
+    restart: on-failure
+
+networks:
+  main_network:
+    driver: bridge
+
+volumes:
+  clickhouse-data:
+  clickhouse-log:
